@@ -1,12 +1,97 @@
+// ── Render centralized data (experience / certs / research / achievements) ──
+function renderExperiencePage() {
+    if (typeof window.PORTFOLIO_EXPERIENCE === 'undefined') return;
+    const D = window.PORTFOLIO_EXPERIENCE;
+
+    // Experience timeline
+    const expTimeline = document.getElementById('experience-timeline');
+    if (expTimeline && Array.isArray(D.experience)) {
+        D.experience.forEach((job, i) => {
+            const item = document.createElement('div');
+            item.className = 'exp-item scroll-reveal' + (i % 2 === 1 ? ' delay-1' : '');
+            const duties = (job.responsibilities || [])
+                .map(r => `<li>${r}</li>`).join('');
+            item.innerHTML = `
+                <div class="exp-node" aria-hidden="true"></div>
+                <div class="exp-card">
+                    <div class="exp-topline">
+                        <span class="exp-role">${job.role}</span>
+                        <span class="exp-year">${job.duration}</span>
+                    </div>
+                    <h3 class="exp-org">${job.org}</h3>
+                    <p class="exp-location">${job.location}</p>
+                    <ul class="exp-list">${duties}</ul>
+                    <a href="${job.certUrl}" target="_blank" rel="noopener noreferrer"
+                        class="btn-certificate">VIEW CERTIFICATE</a>
+                </div>`;
+            expTimeline.appendChild(item);
+        });
+    }
+
+    // Certifications grid
+    const certGrid = document.getElementById('certifications-grid');
+    if (certGrid && Array.isArray(D.certifications)) {
+        D.certifications.forEach((cert, i) => {
+            const card = document.createElement('div');
+            card.className = 'certification-card scroll-reveal' + (i % 2 === 1 ? ' delay-1' : '');
+            card.innerHTML = `
+                <h3 class="cert-title">${cert.title}</h3>
+                <a href="${cert.url}" target="_blank" rel="noopener noreferrer"
+                    class="btn-certificate">VIEW CERTIFICATE</a>`;
+            certGrid.appendChild(card);
+        });
+    }
+
+    // Research publication
+    const researchList = document.getElementById('research-list');
+    if (researchList && D.research) {
+        const r = D.research;
+        const card = document.createElement('div');
+        card.className = 'research-card scroll-reveal';
+        card.innerHTML = `
+            <h3 class="research-title">${r.title}</h3>
+            <p class="research-desc">${r.desc}</p>
+            <a href="${r.url}" target="_blank" rel="noopener noreferrer"
+                class="btn-certificate">VIEW RESEARCH PAPER</a>`;
+        researchList.appendChild(card);
+    }
+
+    // Achievements
+    const achGrid = document.getElementById('achievements-grid');
+    if (achGrid && Array.isArray(D.achievements)) {
+        D.achievements.forEach((a, i) => {
+            const card = document.createElement('div');
+            card.className = 'achievement-card scroll-reveal' + (i % 2 === 1 ? ' delay-1' : '');
+            let html = `
+                <div class="achievement-icon">${a.icon || '🏆'}</div>
+                <h3 class="achievement-name">${a.name}</h3>
+                ${a.org ? `<p class="achievement-org">${a.org}</p>` : ''}
+                <p class="achievement-desc">${a.desc}</p>`;
+            if (a.certUrl) {
+                html += `<a href="${a.certUrl}" target="_blank" rel="noopener noreferrer" class="btn-certificate">VIEW CERTIFICATE</a>`;
+            }
+            card.innerHTML = html;
+            achGrid.appendChild(card);
+        });
+    }
+}
+
 // Wait for DOM to load
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ── Smooth Scrolling ──
+    // ── Render experience page data ──
+    renderExperiencePage();
+
+    // ── Smooth Scrolling (same-page anchors only) ──
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            const target = document.querySelector(this.getAttribute('href'));
-            if (target) target.scrollIntoView({ behavior: 'smooth' });
+            const href = this.getAttribute('href');
+            if (href.length < 2) return;
+            const target = document.querySelector(href);
+            if (target) {
+                e.preventDefault();
+                target.scrollIntoView({ behavior: 'smooth' });
+            }
         });
     });
 
@@ -15,6 +100,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (navbar) {
         window.addEventListener('scroll', () => {
             navbar.classList.toggle('scrolled', window.scrollY > 50);
+        });
+    }
+
+    // ── Scroll Progress Indicator ──
+    const scrollProgress = document.getElementById('scrollProgress');
+    if (scrollProgress) {
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const scrollPercent = (scrollTop / docHeight) * 100;
+            scrollProgress.style.width = scrollPercent + '%';
         });
     }
 
@@ -48,8 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Mac Dock: Active Section Tracking via IntersectionObserver ──
-    const sectionIds = ['hero', 'about', 'skills', 'projects', 'contact'];
-    const dockItems  = document.querySelectorAll('.dock-item');
+    const dockItems = document.querySelectorAll('.dock-item');
 
     function setActiveDock(id) {
         dockItems.forEach(item => {
@@ -57,38 +152,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Track which sections are visible and pick the most prominent one
-    const visibleSections = new Map();
-
+    // Track sections that actually exist on the current page (works for both pages)
     const sectionObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
-                visibleSections.set(entry.target.id, entry.intersectionRatio);
-            } else {
-                visibleSections.delete(entry.target.id);
-            }
-
-            // Find the section with the highest intersection ratio
-            if (visibleSections.size > 0) {
-                let maxRatio = 0;
-                let activeId = '';
-                visibleSections.forEach((ratio, id) => {
-                    if (ratio > maxRatio) {
-                        maxRatio = ratio;
-                        activeId = id;
-                    }
-                });
-                if (activeId) setActiveDock(activeId);
+                setActiveDock(entry.target.id);
             }
         });
     }, {
-        threshold: [0.1, 0.25, 0.5, 0.75],
-        rootMargin: '0px 0px -40% 0px'
+        threshold: 0.3,
+        rootMargin: '-30% 0px -45% 0px'
     });
 
-    sectionIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) sectionObserver.observe(el);
+    dockItems.forEach(item => {
+        const target = document.getElementById(item.dataset.section);
+        if (target) sectionObserver.observe(target);
     });
 
     // ── Mac Dock: Bounce on Click ──
@@ -113,5 +191,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ── Initial Active ──
-    setActiveDock('hero');
+    const initialSection = document.body.querySelector('.dock-item.active');
+    if (!initialSection) setActiveDock('hero');
 });
